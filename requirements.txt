@@ -6,3 +6,4 @@ langchain-text-splitters
 faiss-cpu
 openai==1.30.0
 pydantic==2.7.4
+python-3.10
