@@ -1,59 +1,90 @@
 import streamlit as st
 import os
 
-st.set_page_config(page_title="Mudassar AI Assistant", layout="centered")
+from langchain_community.document_loaders import TextLoader
+from langchain.text_splitter import RecursiveCharacterTextSplitter
+from langchain_community.vectorstores import FAISS
+from langchain_openai import OpenAIEmbeddings, ChatOpenAI
+from langchain.chains import RetrievalQA
 
-st.title("🤖 Mudassar Personal AI Chatbot")
+# =====================
+# CONFIG
+# =====================
+st.set_page_config(page_title="Mudassar AI", page_icon="🤖", layout="centered")
 
-DATA_FOLDER = "data"
+st.title("🤖 Mudassar Personal AI Assistant (RAG)")
 
-# 📂 Load all files
-def load_all_data():
-    text = ""
-    for file in os.listdir(DATA_FOLDER):
-        if file.endswith(".txt"):
-            with open(os.path.join(DATA_FOLDER, file), "r", encoding="utf-8") as f:
-                text += f"\n\n" + f.read()
-    return text
+# =====================
+# SHOW IMAGE (PROFILE)
+# =====================
+image_path = "data/mudassar.jpg"
 
-all_data = load_all_data()
+if os.path.exists(image_path):
+    st.image(image_path, width=200)
+    st.caption("Muhammad Mudassar - AI Developer")
 
-# 🧠 Simple AI logic (upgrade later to RAG)
-def get_answer(question):
-    q = question.lower()
+# =====================
+# API KEY (PUT YOUR KEY)
+# =====================
+os.environ["OPENAI_API_KEY"] = "YOUR_OPENAI_API_KEY"
 
-    if "name" in q:
-        return "My name is Muhammad Mudassar."
+DATA_PATH = "data"
 
-    if "education" in q:
-        return open("data/education.txt", encoding="utf-8").read()
+# =====================
+# LOAD FILES
+# =====================
+documents = []
 
-    if "projects" in q:
-        return open("data/flutter_AI_Apps.txt", encoding="utf-8").read()
+for file in os.listdir(DATA_PATH):
+    if file.endswith(".txt"):
+        loader = TextLoader(os.path.join(DATA_PATH, file), encoding="utf-8")
+        documents.extend(loader.load())
 
-    if "machine learning" in q:
-        return open("data/machine_learning_projects.txt", encoding="utf-8").read()
+# =====================
+# SPLIT TEXT
+# =====================
+text_splitter = RecursiveCharacterTextSplitter(
+    chunk_size=500,
+    chunk_overlap=100
+)
 
-    if "skills" in q:
-        return open("data/skills.txt", encoding="utf-8").read()
+docs = text_splitter.split_documents(documents)
 
-    if "contact" in q:
-        return open("data/contactinfo.txt", encoding="utf-8").read()
+# =====================
+# EMBEDDINGS + VECTOR DB
+# =====================
+embeddings = OpenAIEmbeddings()
+db = FAISS.from_documents(docs, embeddings)
 
-    if "achievements" in q:
-        return open("data/achievements.txt", encoding="utf-8").read()
+retriever = db.as_retriever()
 
-    if "who are you" in q:
-        return open("data/about.txt", encoding="utf-8").read()
+# =====================
+# AI MODEL (BRAIN)
+# =====================
+llm = ChatOpenAI(model="gpt-4o-mini")
 
-    return "I don't know this yet. Ask about education, skills, projects, or contact info."
+qa = RetrievalQA.from_chain_type(
+    llm=llm,
+    retriever=retriever
+)
 
-# 💬 UI
-user_input = st.text_input("Ask about Mudassar:")
+# =====================
+# CHAT UI
+# =====================
+st.subheader("💬 Ask anything about Mudassar")
+
+user_input = st.text_input("Type your question:")
 
 if user_input:
-    response = get_answer(user_input)
-    st.write(response)
+    with st.spinner("Thinking... 🤔"):
+        response = qa.run(user_input)
+        st.success(response)
 
+# =====================
+# SIDEBAR (DATA PREVIEW)
+# =====================
 st.sidebar.title("📂 Data Preview")
-st.sidebar.write(all_data[:1000])
+
+for file in os.listdir(DATA_PATH):
+    if file.endswith(".txt"):
+        st.sidebar.write("📄", file)
