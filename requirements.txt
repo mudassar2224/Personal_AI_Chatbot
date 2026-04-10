@@ -1,8 +1,8 @@
-streamlit
+streamlit==1.32.0
 langchain==0.2.16
 langchain-community
 langchain-openai
 langchain-text-splitters
 faiss-cpu
-openai
-tiktoken
+openai==1.30.0
+pydantic==2.7.4
