@@ -1,0 +1,8 @@
+AI Personal Chatbot → Chatbot trained on personal data using RAG
+AI Wallpaper Generator → Generates wallpapers using prompts and chatbot logic
+Weather App → Uses Open-Meteo API with animations and forecasts
+Flutter Recipe App → Displays recipes with structured UI
+Spotify-Style Music App → Customized UI with Pakistani artists
+PDF Generator App → Create PDFs with different features
+PDF Compressor Website → Compress PDFs efficiently
+AI Video Generator → Uses Pexels + Groq APIs to generate videos

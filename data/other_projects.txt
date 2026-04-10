@@ -1,0 +1,7 @@
+Babysitter UI Project → UI design system
+Remote PC Control → Control system for PC remotely
+Personal Assistant → AI-based assistant system
+Code Assistant → Coding helper chatbot
+Quiz App → Interactive quiz system
+UI Repository → UI design experiments
+Datasets Repository → Collection of ML datasets

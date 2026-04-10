@@ -1,0 +1,22 @@
+
+email_verification.py → Verifies email format and validity
+emoji_to_name.py → Converts emojis into readable names
+file_to_zip.py → Compress files into ZIP format
+github.py → Interacts with GitHub APIs
+image_to_sketch.py → Converts images into sketch format
+modern_compiler.py → Basic code compiling system
+name_to_formula.py → Converts names into formula-based patterns
+news_shortner.py → Summarizes news content
+pandas_test.py → Data analysis using pandas
+pdf_to_text.py → Extracts text from PDF files
+personal_screen_recorder.py → Records screen activity
+properqr.py → Generates advanced QR codes
+qr.py → Basic QR generator
+regex.py → Pattern matching utilities
+python_compiler.py → Executes Python code dynamically
+url_shortner.py → Shortens URLs
+video_to_gif.py → Converts video into GIF
+video_to_gif_gui.py → GUI version of video-to-GIF converter
+space_war.py → Python-based game
+ttt.py → Tic Tac Toe game
+scratch.py & sketch_practice.py → Practice-based implementations

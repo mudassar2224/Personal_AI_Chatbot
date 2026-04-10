@@ -1,0 +1,9 @@
+Name: Muhammad Mudassar
+Date of Birth: 15 December 2004
+Age: 20
+Location: Khudian Khas, Kasur, Pakistan
+Degree: BS Artificial Intelligence (UMT, 6th Semester)
+Profession: Flutter Developer & AI Student
+Experience: Freelance Developer (2024–Present)
+Skills: Flutter, Firebase, ML, DL, Chatbots
+Expected Salary: 30,000 – 60,000 USD/ye
