@@ -539,7 +539,7 @@ def inject_modern_styles() -> None:
             -webkit-text-fill-color: #0f172a !important;
             caret-color: #0f172a !important;
             font-weight: 500 !important;
-            font-size: 1.08rem !important;
+            font-size: 3.08rem !important;
             line-height: 1.45 !important;
         }
 
