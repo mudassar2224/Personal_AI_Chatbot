@@ -10,6 +10,7 @@ os.environ["STREAMLIT_WATCHDOG_IGNORE"] = "torch"
 
 BASE_DIR = Path(__file__).resolve().parent
 EMBEDDING_MODEL_NAME = "sentence-transformers/all-MiniLM-L6-v2"
+DEFAULT_GROQ_MODEL = "llama-3.1-8b-instant"
 FAISS_CACHE_DIR = BASE_DIR / ".cache" / "faiss_index"
 FAISS_META_PATH = BASE_DIR / ".cache" / "faiss_meta.json"
 
@@ -49,7 +50,7 @@ def build_data_signature(text_files: list[Path]) -> str:
 
 
 @st.cache_resource(show_spinner="Preparing knowledge base...")
-def build_qa_chain(data_path: Path, groq_api_key: str, data_signature: str):
+def build_qa_chain(data_path: Path, groq_api_key: str, groq_model: str, data_signature: str):
     try:
         from langchain.chains import RetrievalQA
         from langchain_community.document_loaders import TextLoader
@@ -118,7 +119,7 @@ def build_qa_chain(data_path: Path, groq_api_key: str, data_signature: str):
 
     retriever = db.as_retriever(search_kwargs={"k": 4})
 
-    llm = ChatGroq(api_key=groq_api_key, model="llama3-8b-8192")
+    llm = ChatGroq(api_key=groq_api_key, model=groq_model)
 
     return RetrievalQA.from_chain_type(llm=llm, retriever=retriever), index_source, len(text_files)
 
@@ -149,6 +150,16 @@ if not groq_api_key:
     except Exception:
         groq_api_key = ""
 
+groq_model = os.getenv("GROQ_MODEL", "").strip()
+if not groq_model:
+    try:
+        groq_model = str(st.secrets.get("GROQ_MODEL", "")).strip()
+    except Exception:
+        groq_model = ""
+
+if not groq_model:
+    groq_model = DEFAULT_GROQ_MODEL
+
 invalid_key_values = {"", "your_groq_api_key", "undefined", "none", "null"}
 if groq_api_key.strip().lower() in invalid_key_values:
     st.error("Please set `GROQ_API_KEY` in `.env` or Streamlit Secrets before running the assistant.")
@@ -167,7 +178,7 @@ if not text_files:
 data_signature = build_data_signature(text_files)
 
 try:
-    qa, index_source, indexed_file_count = build_qa_chain(data_path, groq_api_key, data_signature)
+    qa, index_source, indexed_file_count = build_qa_chain(data_path, groq_api_key, groq_model, data_signature)
 except Exception as exc:
     st.error("Failed to initialize the RAG pipeline.")
     st.caption(str(exc))
@@ -188,15 +199,24 @@ user_input = st.text_input("Type your question:")
 if user_input:
     with st.spinner("Thinking... 🤔"):
         try:
-            response = qa.invoke({"query": user_input}).get("result", "")
-        except Exception:
-            response = qa.run(user_input)
-        st.success(response)
+            raw_response = qa.invoke({"query": user_input})
+            response = raw_response.get("result", "") if isinstance(raw_response, dict) else str(raw_response)
+            if not response.strip():
+                st.warning("The model returned an empty response. Please try rephrasing your question.")
+            else:
+                st.success(response)
+        except Exception as exc:
+            st.error("The Groq request failed.")
+            st.caption(f"{type(exc).__name__}: {exc}")
+            st.info(
+                "Try setting `GROQ_MODEL` to `llama-3.1-8b-instant` or `llama-3.3-70b-versatile` in Streamlit Secrets."
+            )
 
 # =====================
 # SIDEBAR
 # =====================
 st.sidebar.title("📂 Data Preview")
+st.sidebar.caption(f"Model: {groq_model}")
 if index_source == "cache":
     st.sidebar.success("⚡ FAISS index loaded from cache")
 else:
