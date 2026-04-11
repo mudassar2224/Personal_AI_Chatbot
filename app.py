@@ -279,10 +279,10 @@ def inject_modern_styles() -> None:
         """
         <style>
         :root {
-            --assistant-font-size: 14px;
-            --assistant-line-height: 1.5;
-            --user-font-size: 14px;
-            --user-line-height: 1.5;
+            --assistant-font-size: clamp(16px, 0.2vw + 15.4px, 17px);
+            --assistant-line-height: 1.6;
+            --user-font-size: clamp(15.5px, 0.15vw + 14.9px, 16.2px);
+            --user-line-height: 1.55;
         }
 
         .stApp {
@@ -413,7 +413,7 @@ def inject_modern_styles() -> None:
 
         .chat-bubble {
             max-width: 88%;
-            padding: 0.82rem 1rem;
+            padding: 0.88rem 1.04rem;
             border-radius: 8px;
             line-height: var(--assistant-line-height);
             font-size: var(--assistant-font-size);
@@ -539,7 +539,7 @@ def inject_modern_styles() -> None:
             -webkit-text-fill-color: #0f172a !important;
             caret-color: #0f172a !important;
             font-weight: 500 !important;
-            font-size: 1.02rem !important;
+            font-size: 1.08rem !important;
             line-height: 1.45 !important;
         }
 
@@ -565,10 +565,10 @@ def inject_modern_styles() -> None:
 
         @media (max-width: 900px) {
             :root {
-                --assistant-font-size: 14px;
-                --assistant-line-height: 1.5;
-                --user-font-size: 14px;
-                --user-line-height: 1.5;
+                --assistant-font-size: 15.8px;
+                --assistant-line-height: 1.58;
+                --user-font-size: 15.4px;
+                --user-line-height: 1.54;
             }
 
             [data-testid="stAppViewContainer"] > .main .block-container {
@@ -583,7 +583,7 @@ def inject_modern_styles() -> None:
 
             .chat-bubble {
                 max-width: 88%;
-                padding: 0.76rem 0.88rem;
+                padding: 0.84rem 0.94rem;
             }
 
             [data-testid="stChatInput"] {
