@@ -1,7 +1,11 @@
-import os
+import base64
 import hashlib
+import html
 import json
+import mimetypes
+import os
 import sys
+import time
 from pathlib import Path
 
 import streamlit as st
@@ -13,6 +17,8 @@ EMBEDDING_MODEL_NAME = "sentence-transformers/all-MiniLM-L6-v2"
 DEFAULT_GROQ_MODEL = "llama-3.1-8b-instant"
 FAISS_CACHE_DIR = BASE_DIR / ".cache" / "faiss_index"
 FAISS_META_PATH = BASE_DIR / ".cache" / "faiss_meta.json"
+BACKGROUND_VIDEO_PATH = Path(r"C:\FlutterFinal\Personal_AI\data\mudassar.mp4")
+
 PROFILE_IMAGE_CANDIDATES = (
     "mudassar.jpg",
     "mudassar.jpeg",
@@ -21,6 +27,7 @@ PROFILE_IMAGE_CANDIDATES = (
     "profile.jpeg",
     "profile.png",
 )
+
 FALLBACK_TRIGGER_PHRASES = (
     "i don't have any information",
     "i do not have any information",
@@ -85,33 +92,8 @@ def should_show_profile_image(question: str, answer: str) -> bool:
     normalized_question = question.strip().lower()
     normalized_answer = answer.strip().lower()
 
-    image_keywords = (
-        "image",
-        "photo",
-        "picture",
-        "pic",
-        "show me",
-        "profile",
-    )
-
-    return (
-        "show_image" in normalized_answer
-        or any(keyword in normalized_question for keyword in image_keywords)
-    )
-
-
-def render_profile_image_reply(profile_image_path: Path | None, profile_image_url: str) -> None:
-    if profile_image_path:
-        st.image(str(profile_image_path), width=260)
-        st.caption("Here is Mudassar's image.")
-        return
-
-    if profile_image_url and profile_image_url.lower() not in {"undefined", "none", "null"}:
-        st.image(profile_image_url, width=260)
-        st.caption("Here is Mudassar's image.")
-        return
-
-    st.warning("I couldn't find the profile image. Please add `mudassar.jpg` in `data/` or set `PROFILE_IMAGE_URL`.")
+    image_keywords = ("image", "photo", "picture", "pic", "show me", "profile")
+    return "show_image" in normalized_answer or any(keyword in normalized_question for keyword in image_keywords)
 
 
 def should_use_full_context_fallback(answer: str) -> bool:
@@ -130,6 +112,297 @@ def build_data_signature(text_files: list[Path]) -> str:
         hasher.update(str(stat.st_mtime_ns).encode("utf-8"))
 
     return hasher.hexdigest()
+
+
+@st.cache_data(show_spinner=False)
+def file_to_data_uri(file_path_str: str, fallback_mime: str) -> str | None:
+    file_path = Path(file_path_str)
+    if not file_path.exists():
+        return None
+
+    mime_type = mimetypes.guess_type(file_path.name)[0] or fallback_mime
+    encoded = base64.b64encode(file_path.read_bytes()).decode("utf-8")
+    return f"data:{mime_type};base64,{encoded}"
+
+
+def inject_modern_styles() -> None:
+    st.markdown(
+        """
+        <style>
+        .stApp {
+            background: #0b1020;
+            color: #e2e8f0;
+        }
+
+        [data-testid="stAppViewContainer"],
+        [data-testid="stAppViewContainer"] > .main,
+        [data-testid="stAppViewContainer"] > .main .block-container {
+            background: transparent !important;
+        }
+
+        [data-testid="stHeader"],
+        [data-testid="stToolbar"] {
+            background: transparent !important;
+        }
+
+        .video-background {
+            position: fixed;
+            inset: 0;
+            z-index: -20;
+            overflow: hidden;
+        }
+
+        .video-background video {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            filter: saturate(1.05) brightness(0.92);
+        }
+
+        .video-overlay {
+            position: fixed;
+            inset: 0;
+            z-index: -19;
+            background: rgba(3, 6, 13, 0.62);
+        }
+
+        [data-testid="stAppViewContainer"] > .main .block-container {
+            max-width: 920px;
+            padding-top: 1.2rem;
+            padding-bottom: 8rem;
+        }
+
+        .fade-in {
+            animation: fadeInUp 0.45s ease both;
+        }
+
+        @keyframes fadeInUp {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .profile-wrapper {
+            text-align: center;
+            margin-bottom: 1.2rem;
+        }
+
+        .profile-avatar {
+            width: 160px;
+            height: 160px;
+            border-radius: 50%;
+            object-fit: cover;
+            border: 3px solid rgba(255, 255, 255, 0.65);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
+        }
+
+        .profile-avatar.placeholder {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            background: rgba(15, 23, 42, 0.8);
+            color: #e2e8f0;
+            font-size: 3rem;
+            font-weight: 700;
+        }
+
+        .profile-name {
+            margin-top: 0.65rem;
+            font-size: 1.65rem;
+            font-weight: 700;
+            color: #f8fafc;
+        }
+
+        .profile-role {
+            margin-top: 0.2rem;
+            color: #cbd5e1;
+            font-size: 1rem;
+        }
+
+        .chat-title {
+            text-align: center;
+            margin: 1rem 0 0.4rem;
+            color: #f8fafc;
+            font-size: 2.05rem;
+        }
+
+        .chat-subtitle {
+            text-align: center;
+            color: #cbd5e1;
+            margin-bottom: 1rem;
+        }
+
+        .chat-row {
+            display: flex;
+            width: 100%;
+            margin: 0.42rem 0;
+        }
+
+        .chat-row.user { justify-content: flex-end; }
+        .chat-row.assistant { justify-content: flex-start; }
+
+        .chat-bubble {
+            max-width: min(82%, 760px);
+            padding: 0.8rem 1rem;
+            border-radius: 16px;
+            line-height: 1.58;
+            backdrop-filter: blur(8px);
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+
+        .chat-bubble.user {
+            background: linear-gradient(135deg, rgba(59, 130, 246, 0.88), rgba(16, 185, 129, 0.85));
+            color: #ffffff;
+            border-bottom-right-radius: 6px;
+            box-shadow: 0 8px 20px rgba(14, 116, 144, 0.35);
+        }
+
+        .chat-bubble.assistant {
+            background: rgba(15, 23, 42, 0.82);
+            color: #e2e8f0;
+            border: 1px solid rgba(226, 232, 240, 0.12);
+            border-bottom-left-radius: 6px;
+            box-shadow: 0 8px 20px rgba(2, 6, 23, 0.35);
+        }
+
+        .chat-image-wrap {
+            margin: 0.35rem 0 0.9rem;
+        }
+
+        .chat-image-wrap img {
+            border-radius: 14px;
+            border: 1px solid rgba(226, 232, 240, 0.15);
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.38);
+        }
+
+        [data-testid="stChatInput"] {
+            position: fixed;
+            left: 50%;
+            bottom: 16px;
+            transform: translateX(-50%);
+            width: min(920px, calc(100% - 2rem));
+            z-index: 1001;
+        }
+
+        [data-testid="stChatInput"] > div {
+            border-radius: 999px;
+            background: rgba(15, 23, 42, 0.8);
+            border: 1px solid rgba(226, 232, 240, 0.15);
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.35);
+            backdrop-filter: blur(8px);
+        }
+
+        [data-testid="stChatInput"] textarea {
+            color: #e2e8f0 !important;
+        }
+
+        [data-testid="stChatInput"] textarea::placeholder {
+            color: rgba(226, 232, 240, 0.8) !important;
+        }
+
+        [data-testid="stSidebar"] {
+            background: rgba(10, 14, 24, 0.75) !important;
+            border-right: 1px solid rgba(226, 232, 240, 0.08);
+            backdrop-filter: blur(8px);
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+def render_background_video(video_path: Path) -> bool:
+    video_data_uri = file_to_data_uri(str(video_path), "video/mp4")
+    if not video_data_uri:
+        st.markdown('<div class="video-overlay"></div>', unsafe_allow_html=True)
+        return False
+
+    st.markdown(
+        f"""
+        <div class="video-background">
+            <video autoplay loop muted playsinline>
+                <source src="{video_data_uri}" type="video/mp4" />
+            </video>
+        </div>
+        <div class="video-overlay"></div>
+        """,
+        unsafe_allow_html=True,
+    )
+    return True
+
+
+def build_chat_bubble_html(role: str, text: str) -> str:
+    safe_text = html.escape(text).replace("\n", "<br>")
+    safe_role = "user" if role == "user" else "assistant"
+    return (
+        f'<div class="chat-row {safe_role} fade-in">'
+        f'<div class="chat-bubble {safe_role}">{safe_text}</div>'
+        "</div>"
+    )
+
+
+def render_chat_bubble(role: str, text: str) -> None:
+    st.markdown(build_chat_bubble_html(role, text), unsafe_allow_html=True)
+
+
+def render_typing_assistant_bubble(text: str) -> None:
+    clean_text = text.strip()
+    if not clean_text:
+        return
+
+    placeholder = st.empty()
+    if len(clean_text) > 900:
+        placeholder.markdown(build_chat_bubble_html("assistant", clean_text), unsafe_allow_html=True)
+        return
+
+    words = clean_text.split()
+    typed_words: list[str] = []
+    for i, word in enumerate(words):
+        typed_words.append(word)
+        cursor = " ▌" if i < len(words) - 1 else ""
+        placeholder.markdown(
+            build_chat_bubble_html("assistant", " ".join(typed_words) + cursor),
+            unsafe_allow_html=True,
+        )
+        time.sleep(0.02)
+
+    placeholder.markdown(build_chat_bubble_html("assistant", clean_text), unsafe_allow_html=True)
+
+
+def render_profile_header(profile_image_path: Path | None, profile_image_url: str) -> None:
+    image_src = None
+    if profile_image_path:
+        image_src = file_to_data_uri(str(profile_image_path), "image/jpeg")
+
+    if not image_src and profile_image_url and profile_image_url.lower() not in {"undefined", "none", "null"}:
+        image_src = profile_image_url
+
+    if image_src:
+        avatar_html = f'<img class="profile-avatar" src="{image_src}" alt="Muhammad Mudassar" />'
+    else:
+        avatar_html = '<div class="profile-avatar placeholder">M</div>'
+
+    st.markdown(
+        f"""
+        <div class="profile-wrapper fade-in">
+            {avatar_html}
+            <div class="profile-name">Muhammad Mudassar</div>
+            <div class="profile-role">AI Developer • Flutter Engineer</div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+def render_profile_image_reply(profile_image_path: Path | None, profile_image_url: str) -> None:
+    st.markdown('<div class="chat-image-wrap fade-in">', unsafe_allow_html=True)
+    if profile_image_path:
+        st.image(str(profile_image_path), width=280)
+    elif profile_image_url and profile_image_url.lower() not in {"undefined", "none", "null"}:
+        st.image(profile_image_url, width=280)
+    else:
+        st.warning("I couldn't find the profile image. Please add `mudassar.jpg` in `data/` or set `PROFILE_IMAGE_URL`.")
+    st.markdown("</div>", unsafe_allow_html=True)
 
 
 @st.cache_resource(show_spinner="Preparing knowledge base...")
@@ -223,15 +496,18 @@ def build_qa_chain(data_path: Path, groq_api_key: str, groq_model: str, data_sig
 
 
 # =====================
-# CONFIG
+# CONFIG + STYLES
 # =====================
-st.set_page_config(page_title="Mudassar AI", page_icon="🤖", layout="centered")
-st.title("🤖 Mudassar Personal AI Assistant (RAG + GROQ)")
+st.set_page_config(page_title="Mudassar AI", page_icon="🤖", layout="wide")
+inject_modern_styles()
+
+video_path = BACKGROUND_VIDEO_PATH if BACKGROUND_VIDEO_PATH.exists() else (BASE_DIR / "data" / "mudassar.mp4")
+video_loaded = render_background_video(video_path)
 
 load_dotenv_file(BASE_DIR / ".env")
 
 # =====================
-# PROFILE IMAGE
+# PROFILE IMAGE CARD
 # =====================
 profile_image_url = os.getenv("PROFILE_IMAGE_URL", "").strip()
 if not profile_image_url:
@@ -243,15 +519,13 @@ if not profile_image_url:
 profile_data_path = BASE_DIR / "data"
 profile_image_path = find_profile_image_path(profile_data_path) if profile_data_path.exists() else None
 
-if has_profile_image(profile_image_path, profile_image_url):
-    if profile_image_path:
-        st.image(str(profile_image_path), width=200)
-        st.caption("Muhammad Mudassar - AI Developer")
-    else:
-        st.image(profile_image_url, width=200)
-        st.caption("Muhammad Mudassar - AI Developer")
-else:
-    st.info("Profile image not found. Add one in `data/` (e.g., `mudassar.jpg`) or set `PROFILE_IMAGE_URL` in Secrets.")
+render_profile_header(profile_image_path, profile_image_url)
+
+st.markdown('<div class="chat-title fade-in">💬 Ask anything about Mudassar</div>', unsafe_allow_html=True)
+st.markdown(
+    '<div class="chat-subtitle fade-in">Personal AI assistant powered by RAG + GROQ</div>',
+    unsafe_allow_html=True,
+)
 
 # =====================
 # API KEY + DATA CHECKS
@@ -316,13 +590,25 @@ except Exception as exc:
         )
     st.stop()
 
+
 # =====================
 # CHAT UI
 # =====================
-st.subheader("💬 Ask anything about Mudassar")
-user_input = st.text_input("Type your question:")
+if "chat_history" not in st.session_state:
+    st.session_state.chat_history = []
+
+for message in st.session_state.chat_history:
+    if message.get("type") == "image":
+        render_profile_image_reply(profile_image_path, profile_image_url)
+    else:
+        render_chat_bubble(message.get("role", "assistant"), message.get("content", ""))
+
+user_input = st.chat_input("Type your question...")
 
 if user_input:
+    st.session_state.chat_history.append({"role": "user", "content": user_input, "type": "text"})
+    render_chat_bubble("user", user_input)
+
     with st.spinner("Thinking... 🤔"):
         try:
             raw_response = qa.invoke({"query": user_input})
@@ -331,6 +617,7 @@ if user_input:
             if should_use_full_context_fallback(response) and full_context.strip():
                 fallback_prompt = (
                     "You are Mudassar's AI assistant. Use only the provided context. "
+                    "If user asks for image, return exactly SHOW_IMAGE. "
                     "If the user asks about projects, list concrete project names and short descriptions from the context. "
                     "If exact details are unavailable, clearly say what is missing and provide the closest relevant information.\n\n"
                     f"Context:\n{full_context}\n\n"
@@ -342,25 +629,39 @@ if user_input:
                     response = fallback_text
 
             if should_show_profile_image(user_input, response):
+                if response.strip().upper() == "SHOW_IMAGE" or not response.strip():
+                    response = "Here is Mudassar's image."
+
+                st.session_state.chat_history.append({"role": "assistant", "content": response, "type": "text"})
+                render_typing_assistant_bubble(response)
+
+                st.session_state.chat_history.append({"role": "assistant", "content": "profile_image", "type": "image"})
                 render_profile_image_reply(profile_image_path, profile_image_url)
-                if response.strip().upper() != "SHOW_IMAGE":
-                    st.success(response)
             elif not response.strip():
-                st.warning("The model returned an empty response. Please try rephrasing your question.")
+                warning_text = "The model returned an empty response. Please try rephrasing your question."
+                st.session_state.chat_history.append({"role": "assistant", "content": warning_text, "type": "text"})
+                render_chat_bubble("assistant", warning_text)
             else:
-                st.success(response)
+                st.session_state.chat_history.append({"role": "assistant", "content": response, "type": "text"})
+                render_typing_assistant_bubble(response)
+
         except Exception as exc:
-            st.error("The Groq request failed.")
-            st.caption(f"{type(exc).__name__}: {exc}")
-            st.info(
-                "Try setting `GROQ_MODEL` to `llama-3.1-8b-instant` or `llama-3.3-70b-versatile` in Streamlit Secrets."
-            )
+            error_text = f"The Groq request failed: {type(exc).__name__}: {exc}"
+            st.session_state.chat_history.append({"role": "assistant", "content": error_text, "type": "text"})
+            render_chat_bubble("assistant", error_text)
+
 
 # =====================
 # SIDEBAR
 # =====================
 st.sidebar.title("📂 Data Preview")
 st.sidebar.caption(f"Model: {groq_model}")
+
+if video_loaded:
+    st.sidebar.success("🎬 Background video active")
+else:
+    st.sidebar.warning("Background video file not found. Add `data/mudassar.mp4`.")
+
 if index_source == "cache":
     st.sidebar.success("⚡ FAISS index loaded from cache")
 else:
