@@ -1,0 +1,13 @@
+KMeans Clustering → Data grouping and color extraction
+TSNE Visualization → High-dimensional data visualization
+Isomap → Non-linear dimensionality reduction
+ICA (Independent Component Analysis) → Signal separation
+PCA → Dimensionality reduction
+DBSCAN & OPTICS → Density-based clustering
+Apriori Algorithm → Association rule learning
+Swiss Roll Reduction (LLE) → Manifold learning
+Breast Cancer detectaion
+movies project using API
+DBSCAN Using The APIS 
+Kmeans Fuzzy kmeans  all types of K means
+Apriori_Algorithm
