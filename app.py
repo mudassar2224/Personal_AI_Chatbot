@@ -279,8 +279,10 @@ def inject_modern_styles() -> None:
         """
         <style>
         :root {
-            --chat-font-size: 15px;
-            --chat-line-height: 1.65;
+            --assistant-font-size: clamp(16px, 0.22vw + 15px, 17px);
+            --assistant-line-height: 1.7;
+            --user-font-size: clamp(15px, 0.16vw + 14.4px, 16px);
+            --user-line-height: 1.62;
         }
 
         .stApp {
@@ -413,8 +415,8 @@ def inject_modern_styles() -> None:
             max-width: min(74%, 760px);
             padding: 0.82rem 1rem;
             border-radius: 14px;
-            line-height: var(--chat-line-height);
-            font-size: var(--chat-font-size);
+            line-height: var(--assistant-line-height);
+            font-size: var(--assistant-font-size);
             letter-spacing: 0.004em;
             backdrop-filter: blur(8px);
             word-wrap: break-word;
@@ -427,6 +429,8 @@ def inject_modern_styles() -> None:
             box-shadow: 0 8px 22px rgba(30, 64, 175, 0.34);
             white-space: pre-wrap;
             font-weight: 500;
+            font-size: var(--user-font-size);
+            line-height: var(--user-line-height);
         }
 
         .chat-bubble.assistant {
@@ -436,6 +440,20 @@ def inject_modern_styles() -> None:
             border-bottom-left-radius: 6px;
             box-shadow: 0 8px 20px rgba(15, 23, 42, 0.22);
             font-weight: 430;
+            font-size: var(--assistant-font-size);
+            line-height: var(--assistant-line-height);
+        }
+
+        .assistant-content,
+        .assistant-content p,
+        .assistant-content li,
+        .assistant-content ul,
+        .assistant-content ol,
+        .assistant-content h3,
+        .assistant-content h4,
+        .assistant-content h5 {
+            font-size: inherit;
+            line-height: inherit;
         }
 
         .assistant-content {
@@ -521,7 +539,7 @@ def inject_modern_styles() -> None:
             -webkit-text-fill-color: #0f172a !important;
             caret-color: #0f172a !important;
             font-weight: 500 !important;
-            font-size: 0.98rem !important;
+            font-size: 1.02rem !important;
             line-height: 1.45 !important;
         }
 
@@ -546,6 +564,13 @@ def inject_modern_styles() -> None:
         }
 
         @media (max-width: 900px) {
+            :root {
+                --assistant-font-size: 15.8px;
+                --assistant-line-height: 1.68;
+                --user-font-size: 15.1px;
+                --user-line-height: 1.6;
+            }
+
             [data-testid="stAppViewContainer"] > .main .block-container {
                 padding-left: 0.75rem;
                 padding-right: 0.75rem;
@@ -557,8 +582,7 @@ def inject_modern_styles() -> None:
             }
 
             .chat-bubble {
-                max-width: 92%;
-                font-size: 14.8px;
+                max-width: 94%;
                 padding: 0.76rem 0.88rem;
             }
 
