@@ -46,6 +46,27 @@ GREETING_INPUTS = {
     "assalamu alaikum",
 }
 
+QA_PROMPT_TEMPLATE = """
+You are Mudassar's AI assistant.
+Use only the provided context to answer the question.
+If the answer is missing in context, say: "I don't have that in the available profile data yet."
+If the user asks for image/photo/picture/profile image, return exactly: SHOW_IMAGE
+
+Formatting requirements:
+- Keep tone professional, clear, and concise.
+- Use Markdown with short paragraphs and bullet points when listing items.
+- Avoid long intros like "As Mudassar's AI assistant...".
+- Use **bold** only for important keywords.
+- Mention concrete project/skill names from context when relevant.
+
+Context:
+{context}
+
+Question: {question}
+
+Answer:
+""".strip()
+
 
 def load_dotenv_file(env_path: Path) -> None:
     if not env_path.exists():
@@ -124,13 +145,111 @@ def clean_assistant_response(question: str, response: str) -> str:
         r"^hello[^\n]*assistant[^\n]*[.!?]\s*",
         r"^hi[^\n]*assistant[^\n]*[.!?]\s*",
         r"^assalamu[^\n]*assistant[^\n]*[.!?]\s*",
+        r"^as[^\n]*assistant[^\n]*[:\-]\s*",
     )
 
     for pattern in generic_intro_patterns:
         cleaned = re.sub(pattern, "", cleaned, flags=re.IGNORECASE)
 
-    cleaned = re.sub(r"\s+", " ", cleaned).strip()
-    return cleaned or response.strip()
+    cleaned = re.sub(r"[ \t]+", " ", cleaned)
+    cleaned = re.sub(r"[ \t]*\n[ \t]*", "\n", cleaned)
+    cleaned = re.sub(r"\n{3,}", "\n\n", cleaned).strip()
+    return normalize_answer_layout(cleaned) or response.strip()
+
+
+def normalize_answer_layout(text: str) -> str:
+    normalized = text.replace("\r\n", "\n").replace("\r", "\n").strip()
+    if not normalized:
+        return ""
+
+    normalized = re.sub(r"(?<!\n)(\d+\.\s+)", r"\n\1", normalized)
+    normalized = re.sub(r"(?<!\n)([-*]\s+)", r"\n\1", normalized)
+    normalized = re.sub(r"\n{3,}", "\n\n", normalized)
+    return normalized.strip()
+
+
+def format_inline_assistant_html(text: str) -> str:
+    escaped = html.escape(text)
+    escaped = re.sub(r"`([^`]+)`", r"<code>\1</code>", escaped)
+    escaped = re.sub(r"\*\*(.+?)\*\*", r"<strong>\1</strong>", escaped)
+    escaped = re.sub(r"\*(.+?)\*", r"<em>\1</em>", escaped)
+    return escaped
+
+
+def assistant_markdown_to_html(text: str) -> str:
+    normalized = normalize_answer_layout(text)
+    if not normalized:
+        return ""
+
+    lines = normalized.split("\n")
+    blocks: list[str] = []
+    paragraph_parts: list[str] = []
+    list_kind: str | None = None
+    list_items: list[str] = []
+
+    def flush_paragraph() -> None:
+        nonlocal paragraph_parts
+        if not paragraph_parts:
+            return
+
+        paragraph_text = " ".join(part.strip() for part in paragraph_parts if part.strip())
+        if paragraph_text:
+            blocks.append(f"<p>{format_inline_assistant_html(paragraph_text)}</p>")
+        paragraph_parts = []
+
+    def flush_list() -> None:
+        nonlocal list_kind, list_items
+        if list_kind and list_items:
+            tag = "ol" if list_kind == "ordered" else "ul"
+            items_html = "".join(f"<li>{format_inline_assistant_html(item)}</li>" for item in list_items)
+            blocks.append(f"<{tag}>{items_html}</{tag}>")
+        list_kind = None
+        list_items = []
+
+    for raw_line in lines:
+        line = raw_line.strip()
+        if not line:
+            flush_paragraph()
+            flush_list()
+            continue
+
+        heading_match = re.match(r"^(#{1,3})\s+(.+)$", line)
+        if heading_match:
+            flush_paragraph()
+            flush_list()
+            level = len(heading_match.group(1)) + 2
+            heading_text = format_inline_assistant_html(heading_match.group(2).strip())
+            blocks.append(f"<h{level}>{heading_text}</h{level}>")
+            continue
+
+        ordered_match = re.match(r"^\d+\.\s+(.+)$", line)
+        if ordered_match:
+            flush_paragraph()
+            if list_kind != "ordered":
+                flush_list()
+                list_kind = "ordered"
+            list_items.append(ordered_match.group(1).strip())
+            continue
+
+        bullet_match = re.match(r"^[-*]\s+(.+)$", line)
+        if bullet_match:
+            flush_paragraph()
+            if list_kind != "unordered":
+                flush_list()
+                list_kind = "unordered"
+            list_items.append(bullet_match.group(1).strip())
+            continue
+
+        flush_list()
+        paragraph_parts.append(line)
+
+    flush_paragraph()
+    flush_list()
+
+    if not blocks:
+        return f"<p>{format_inline_assistant_html(normalized)}</p>"
+
+    return "".join(blocks)
 
 
 def build_data_signature(text_files: list[Path]) -> str:
@@ -159,9 +278,15 @@ def inject_modern_styles() -> None:
     st.markdown(
         """
         <style>
+        :root {
+            --chat-font-size: 15px;
+            --chat-line-height: 1.65;
+        }
+
         .stApp {
             background: #0f172a;
             color: #e2e8f0;
+            font-family: "Segoe UI", "Inter", -apple-system, BlinkMacSystemFont, "Helvetica Neue", Arial, sans-serif;
         }
 
         [data-testid="stAppViewContainer"],
@@ -205,7 +330,7 @@ def inject_modern_styles() -> None:
             position: fixed;
             inset: 0;
             z-index: 1;
-            background: rgba(15, 23, 42, 0.24);
+            background: rgba(15, 23, 42, 0.28);
             pointer-events: none;
         }
 
@@ -265,7 +390,8 @@ def inject_modern_styles() -> None:
             text-align: center;
             margin: 1rem 0 0.4rem;
             color: #f8fafc;
-            font-size: 2.05rem;
+            font-size: 1.82rem;
+            letter-spacing: 0.01em;
         }
 
         .chat-subtitle {
@@ -277,35 +403,90 @@ def inject_modern_styles() -> None:
         .chat-row {
             display: flex;
             width: 100%;
-            margin: 0.42rem 0;
+            margin: 0.54rem 0;
         }
 
         .chat-row.user { justify-content: flex-end; }
         .chat-row.assistant { justify-content: flex-start; }
 
         .chat-bubble {
-            max-width: min(82%, 760px);
-            padding: 0.8rem 1rem;
-            border-radius: 16px;
-            line-height: 1.58;
+            max-width: min(74%, 760px);
+            padding: 0.82rem 1rem;
+            border-radius: 14px;
+            line-height: var(--chat-line-height);
+            font-size: var(--chat-font-size);
+            letter-spacing: 0.004em;
             backdrop-filter: blur(8px);
-            white-space: pre-wrap;
             word-wrap: break-word;
         }
 
         .chat-bubble.user {
-            background: linear-gradient(135deg, rgba(59, 130, 246, 0.88), rgba(16, 185, 129, 0.85));
+            background: linear-gradient(135deg, rgba(37, 99, 235, 0.9), rgba(14, 165, 233, 0.82));
             color: #ffffff;
             border-bottom-right-radius: 6px;
-            box-shadow: 0 8px 20px rgba(14, 116, 144, 0.35);
+            box-shadow: 0 8px 22px rgba(30, 64, 175, 0.34);
+            white-space: pre-wrap;
+            font-weight: 500;
         }
 
         .chat-bubble.assistant {
-            background: rgba(255, 255, 255, 0.78);
-            color: #0f172a;
-            border: 1px solid rgba(148, 163, 184, 0.35);
+            background: rgba(255, 255, 255, 0.9);
+            color: #0b1220;
+            border: 1px solid rgba(148, 163, 184, 0.42);
             border-bottom-left-radius: 6px;
             box-shadow: 0 8px 20px rgba(15, 23, 42, 0.22);
+            font-weight: 430;
+        }
+
+        .assistant-content {
+            text-wrap: pretty;
+        }
+
+        .assistant-content p {
+            margin: 0 0 0.56rem;
+        }
+
+        .assistant-content p:last-child {
+            margin-bottom: 0;
+        }
+
+        .assistant-content ol,
+        .assistant-content ul {
+            margin: 0.16rem 0 0.72rem 1.15rem;
+            padding-left: 0.8rem;
+        }
+
+        .assistant-content li {
+            margin: 0.2rem 0;
+        }
+
+        .assistant-content li::marker {
+            color: #334155;
+        }
+
+        .assistant-content strong {
+            font-weight: 640;
+            color: #0b1220;
+        }
+
+        .assistant-content em {
+            font-style: italic;
+        }
+
+        .assistant-content h3,
+        .assistant-content h4,
+        .assistant-content h5 {
+            margin: 0.2rem 0 0.45rem;
+            line-height: 1.35;
+            color: #0b1220;
+        }
+
+        .assistant-content code {
+            font-family: "Cascadia Code", "Consolas", monospace;
+            font-size: 0.9em;
+            padding: 0.08rem 0.35rem;
+            border-radius: 6px;
+            background: rgba(15, 23, 42, 0.08);
         }
 
         .chat-image-wrap {
@@ -329,9 +510,9 @@ def inject_modern_styles() -> None:
 
         [data-testid="stChatInput"] > div {
             border-radius: 999px;
-            background: rgba(255, 255, 255, 0.96);
+            background: rgba(248, 250, 252, 0.97);
             border: 1px solid rgba(148, 163, 184, 0.45);
-            box-shadow: 0 12px 26px rgba(15, 23, 42, 0.30);
+            box-shadow: 0 12px 24px rgba(2, 6, 23, 0.28);
             backdrop-filter: blur(8px);
         }
 
@@ -340,6 +521,8 @@ def inject_modern_styles() -> None:
             -webkit-text-fill-color: #0f172a !important;
             caret-color: #0f172a !important;
             font-weight: 500 !important;
+            font-size: 0.98rem !important;
+            line-height: 1.45 !important;
         }
 
         [data-testid="stChatInput"] textarea::placeholder {
@@ -360,6 +543,29 @@ def inject_modern_styles() -> None:
             backdrop-filter: blur(8px);
             position: relative;
             z-index: 5;
+        }
+
+        @media (max-width: 900px) {
+            [data-testid="stAppViewContainer"] > .main .block-container {
+                padding-left: 0.75rem;
+                padding-right: 0.75rem;
+                padding-bottom: 7rem;
+            }
+
+            .chat-title {
+                font-size: 1.55rem;
+            }
+
+            .chat-bubble {
+                max-width: 92%;
+                font-size: 14.8px;
+                padding: 0.76rem 0.88rem;
+            }
+
+            [data-testid="stChatInput"] {
+                width: calc(100% - 1rem);
+                bottom: 10px;
+            }
         }
         </style>
         """,
@@ -393,11 +599,16 @@ def render_background_video(video_path: Path) -> bool:
 
 
 def build_chat_bubble_html(role: str, text: str) -> str:
-    safe_text = html.escape(text).replace("\n", "<br>")
     safe_role = "user" if role == "user" else "assistant"
+
+    if safe_role == "assistant":
+        bubble_content = f'<div class="assistant-content">{assistant_markdown_to_html(text)}</div>'
+    else:
+        bubble_content = html.escape(text).replace("\n", "<br>")
+
     return (
         f'<div class="chat-row {safe_role} fade-in">'
-        f'<div class="chat-bubble {safe_role}">{safe_text}</div>'
+        f'<div class="chat-bubble {safe_role}">{bubble_content}</div>'
         "</div>"
     )
 
@@ -446,6 +657,7 @@ def render_profile_image_reply(profile_image_path: Path | None, profile_image_ur
 def build_qa_chain(data_path: Path, groq_api_key: str, groq_model: str, data_signature: str):
     try:
         from langchain.chains import RetrievalQA
+        from langchain.prompts import PromptTemplate
         from langchain_community.document_loaders import TextLoader
         from langchain_community.embeddings import HuggingFaceEmbeddings
         from langchain_community.vectorstores import FAISS
@@ -528,8 +740,19 @@ def build_qa_chain(data_path: Path, groq_api_key: str, groq_model: str, data_sig
     )
 
     llm = ChatGroq(api_key=groq_api_key, model=groq_model)
+    qa_prompt = PromptTemplate(
+        template=QA_PROMPT_TEMPLATE,
+        input_variables=["context", "question"],
+    )
 
-    return RetrievalQA.from_chain_type(llm=llm, retriever=retriever), index_source, len(text_files), llm, full_context
+    retrieval_qa = RetrievalQA.from_chain_type(
+        llm=llm,
+        retriever=retriever,
+        chain_type="stuff",
+        chain_type_kwargs={"prompt": qa_prompt},
+    )
+
+    return retrieval_qa, index_source, len(text_files), llm, full_context
 
 
 # =====================
@@ -648,12 +871,15 @@ if user_input:
 
         if should_use_full_context_fallback(response) and full_context.strip():
             fallback_prompt = (
-                "You are Mudassar's AI assistant. Use only the provided context. "
-                "If user asks for image, return exactly SHOW_IMAGE. "
-                "Answer briefly and directly. Avoid extra greeting text unless the user greets first. "
-                "If the user asks about projects, list concrete project names from the context.\n\n"
+                "You are Mudassar's AI assistant. Use only the provided context.\n"
+                "If user asks for image/photo/picture/profile image, return exactly SHOW_IMAGE.\n"
+                "Write a concise, professional answer using Markdown.\n"
+                "Use bullet points when listing multiple items.\n"
+                "Avoid intros like \"As Mudassar's AI assistant\".\n"
+                "Mention concrete names from context whenever available.\n\n"
                 f"Context:\n{full_context}\n\n"
-                f"Question: {user_input}"
+                f"Question: {user_input}\n\n"
+                "Answer:"
             )
             fallback_result = llm.invoke(fallback_prompt)
             fallback_text = normalize_llm_text(fallback_result).strip()
