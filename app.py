@@ -148,7 +148,8 @@ if not groq_api_key:
     except Exception:
         groq_api_key = ""
 
-if not groq_api_key or groq_api_key == "YOUR_GROQ_API_KEY":
+invalid_key_values = {"", "your_groq_api_key", "undefined", "none", "null"}
+if groq_api_key.strip().lower() in invalid_key_values:
     st.error("Please set `GROQ_API_KEY` in `.env` or Streamlit Secrets before running the assistant.")
     st.stop()
 
