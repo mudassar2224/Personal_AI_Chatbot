@@ -911,26 +911,3 @@ if user_input:
         render_chat_bubble("assistant", error_text)
 
 
-# =====================
-# SIDEBAR
-# =====================
-st.sidebar.title("📂 Data Preview")
-st.sidebar.caption(f"Model: {groq_model}")
-
-if video_loaded:
-    st.sidebar.success("🎬 Background video active")
-    st.sidebar.caption("If motion is still blocked on mobile, browser autoplay policy is likely preventing playback.")
-else:
-    st.sidebar.warning("Background video file not found. Add `data/mudassar.mp4`.")
-
-if index_source == "cache":
-    st.sidebar.success("⚡ FAISS index loaded from cache")
-else:
-    st.sidebar.info("🧠 FAISS index rebuilt and cached")
-
-if empty_text_files:
-    st.sidebar.warning(f"Empty data files: {', '.join(empty_text_files)}")
-
-st.sidebar.caption(f"Indexed files: {indexed_file_count}")
-for file_path in text_files:
-    st.sidebar.write("📄", file_path.name)
