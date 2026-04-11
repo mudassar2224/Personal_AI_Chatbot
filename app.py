@@ -1,6 +1,7 @@
 import os
 import hashlib
 import json
+import sys
 from pathlib import Path
 
 import streamlit as st
@@ -58,8 +59,8 @@ def build_qa_chain(data_path: Path, groq_api_key: str, data_signature: str):
         from langchain_text_splitters import RecursiveCharacterTextSplitter
     except Exception as exc:
         raise RuntimeError(
-            "LangChain dependencies failed to import. "
-            "If this is Streamlit Cloud, set Python to 3.11 in runtime.txt."
+            f"LangChain dependencies failed to import ({exc.__class__.__name__}: {exc}). "
+            "If this is Streamlit Cloud, set Python to 3.11 in runtime.txt and reboot the app."
         ) from exc
 
     text_files = get_text_files(data_path)
@@ -170,6 +171,12 @@ try:
 except Exception as exc:
     st.error("Failed to initialize the RAG pipeline.")
     st.caption(str(exc))
+    root_exc = exc.__cause__ if getattr(exc, "__cause__", None) else exc
+    with st.expander("Technical details"):
+        st.code(
+            f"{type(root_exc).__name__}: {root_exc}\n"
+            f"Python runtime: {sys.version.split()[0]}"
+        )
     st.stop()
 
 # =====================
