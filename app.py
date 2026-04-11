@@ -279,10 +279,10 @@ def inject_modern_styles() -> None:
         """
         <style>
         :root {
-            --assistant-font-size: clamp(16px, 0.2vw + 15.4px, 17px);
-            --assistant-line-height: 1.6;
-            --user-font-size: clamp(15.5px, 0.15vw + 14.9px, 16.2px);
-            --user-line-height: 1.55;
+            --assistant-font-size: clamp(17px, 0.3vw + 15px, 19px);
+            --assistant-line-height: 1.62;
+            --user-font-size: clamp(16.3px, 0.24vw + 14.8px, 18px);
+            --user-line-height: 1.58;
         }
 
         .stApp {
@@ -539,7 +539,7 @@ def inject_modern_styles() -> None:
             -webkit-text-fill-color: #0f172a !important;
             caret-color: #0f172a !important;
             font-weight: 500 !important;
-            font-size: 1.009rem !important;
+            font-size: 1.08rem !important;
             line-height: 1.45 !important;
         }
 
@@ -563,11 +563,20 @@ def inject_modern_styles() -> None:
             z-index: 5;
         }
 
+        @media (max-width: 1200px) {
+            :root {
+                --assistant-font-size: 17px;
+                --assistant-line-height: 1.6;
+                --user-font-size: 16.4px;
+                --user-line-height: 1.56;
+            }
+        }
+
         @media (max-width: 900px) {
             :root {
-                --assistant-font-size: 15.8px;
+                --assistant-font-size: 16.2px;
                 --assistant-line-height: 1.58;
-                --user-font-size: 15.4px;
+                --user-font-size: 15.8px;
                 --user-line-height: 1.54;
             }
 
@@ -578,17 +587,39 @@ def inject_modern_styles() -> None:
             }
 
             .chat-title {
-                font-size: 2.55rem;
+                font-size: 1.58rem;
             }
 
             .chat-bubble {
-                max-width: 88%;
-                padding: 0.84rem 0.94rem;
+                max-width: 92%;
+                padding: 0.9rem 0.98rem;
             }
 
             [data-testid="stChatInput"] {
                 width: calc(100% - 1rem);
                 bottom: 10px;
+            }
+        }
+
+        @media (max-width: 640px) {
+            :root {
+                --assistant-font-size: 15.6px;
+                --assistant-line-height: 1.56;
+                --user-font-size: 15.2px;
+                --user-line-height: 1.52;
+            }
+
+            .chat-title {
+                font-size: 1.42rem;
+            }
+
+            .chat-bubble {
+                max-width: 95%;
+                padding: 0.84rem 0.9rem;
+            }
+
+            [data-testid="stChatInput"] textarea {
+                font-size: 1rem !important;
             }
         }
         </style>
