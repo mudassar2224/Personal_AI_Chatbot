@@ -659,7 +659,7 @@ def render_profile_header(profile_image_path: Path | None, profile_image_url: st
         <div class="profile-wrapper fade-in">
             {avatar_html}
             <div class="profile-name">Muhammad Mudassar</div>
-            <div class="profile-role">AI Developer • Flutter Engineer</div>
+            <div class="profile-role">Flutter Developer • Machine Learning  Engineer</div>
         </div>
         """,
         unsafe_allow_html=True,
