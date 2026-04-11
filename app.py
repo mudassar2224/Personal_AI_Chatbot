@@ -582,7 +582,7 @@ def inject_modern_styles() -> None:
             }
 
             .chat-bubble {
-                max-width: 94%;
+                max-width: 84%;
                 padding: 0.76rem 0.88rem;
             }
 
