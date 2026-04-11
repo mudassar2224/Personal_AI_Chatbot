@@ -4,8 +4,8 @@ import html
 import json
 import mimetypes
 import os
+import re
 import sys
-import time
 from pathlib import Path
 
 import streamlit as st
@@ -36,6 +36,15 @@ FALLBACK_TRIGGER_PHRASES = (
     "does not provide any",
     "no specific information",
 )
+
+GREETING_INPUTS = {
+    "hi",
+    "hello",
+    "hey",
+    "salam",
+    "assalamualaikum",
+    "assalamu alaikum",
+}
 
 
 def load_dotenv_file(env_path: Path) -> None:
@@ -103,6 +112,27 @@ def should_use_full_context_fallback(answer: str) -> bool:
     return any(phrase in normalized for phrase in FALLBACK_TRIGGER_PHRASES)
 
 
+def clean_assistant_response(question: str, response: str) -> str:
+    cleaned = response.strip()
+    if not cleaned:
+        return cleaned
+
+    if question.strip().lower() in GREETING_INPUTS:
+        return "Hi! Ask me anything about Muhammad Mudassar."
+
+    generic_intro_patterns = (
+        r"^hello[^\n]*assistant[^\n]*[.!?]\s*",
+        r"^hi[^\n]*assistant[^\n]*[.!?]\s*",
+        r"^assalamu[^\n]*assistant[^\n]*[.!?]\s*",
+    )
+
+    for pattern in generic_intro_patterns:
+        cleaned = re.sub(pattern, "", cleaned, flags=re.IGNORECASE)
+
+    cleaned = re.sub(r"\s+", " ", cleaned).strip()
+    return cleaned or response.strip()
+
+
 def build_data_signature(text_files: list[Path]) -> str:
     hasher = hashlib.sha256()
     for file_path in text_files:
@@ -138,6 +168,8 @@ def inject_modern_styles() -> None:
         [data-testid="stAppViewContainer"] > .main,
         [data-testid="stAppViewContainer"] > .main .block-container {
             background: transparent !important;
+            position: relative;
+            z-index: 3;
         }
 
         [data-testid="stHeader"],
@@ -145,32 +177,25 @@ def inject_modern_styles() -> None:
             background: transparent !important;
         }
 
-        [data-testid="stVideo"] {
-            position: fixed !important;
+        .video-background {
+            position: fixed;
             inset: 0;
             width: 100vw;
             height: 100vh;
-            z-index: -20;
+            z-index: 0;
             overflow: hidden;
             pointer-events: none;
-            margin: 0 !important;
-            padding: 0 !important;
         }
 
-        [data-testid="stVideo"] > div {
-            width: 100% !important;
-            height: 100% !important;
-        }
-
-        [data-testid="stVideo"] video {
-            width: 100vw !important;
-            height: 100vh !important;
-            object-fit: cover !important;
+        .video-background video {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
             filter: saturate(1.08) brightness(0.95);
             background: #0f172a;
         }
 
-        [data-testid="stVideo"] video::-webkit-media-controls {
+        .video-background video::-webkit-media-controls {
             display: none !important;
             visibility: hidden !important;
             opacity: 0 !important;
@@ -179,8 +204,9 @@ def inject_modern_styles() -> None:
         .video-overlay {
             position: fixed;
             inset: 0;
-            z-index: -19;
-            background: rgba(15, 23, 42, 0.34);
+            z-index: 1;
+            background: rgba(15, 23, 42, 0.24);
+            pointer-events: none;
         }
 
         [data-testid="stAppViewContainer"] > .main .block-container {
@@ -332,6 +358,8 @@ def inject_modern_styles() -> None:
             background: rgba(10, 14, 24, 0.75) !important;
             border-right: 1px solid rgba(226, 232, 240, 0.08);
             backdrop-filter: blur(8px);
+            position: relative;
+            z-index: 5;
         }
         </style>
         """,
@@ -344,10 +372,21 @@ def render_background_video(video_path: Path) -> bool:
         st.markdown('<div class="video-overlay"></div>', unsafe_allow_html=True)
         return False
 
-    try:
-        st.video(str(video_path), autoplay=True, muted=True, loop=True)
-    except TypeError:
-        st.video(str(video_path))
+    video_data_uri = file_to_data_uri(str(video_path), "video/mp4")
+    if not video_data_uri:
+        st.markdown('<div class="video-overlay"></div>', unsafe_allow_html=True)
+        return False
+
+    st.markdown(
+        f"""
+        <div class="video-background">
+            <video autoplay loop muted playsinline webkit-playsinline preload="auto">
+                <source src="{video_data_uri}" type="video/mp4" />
+            </video>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
 
     st.markdown('<div class="video-overlay"></div>', unsafe_allow_html=True)
     return True
@@ -365,30 +404,6 @@ def build_chat_bubble_html(role: str, text: str) -> str:
 
 def render_chat_bubble(role: str, text: str) -> None:
     st.markdown(build_chat_bubble_html(role, text), unsafe_allow_html=True)
-
-
-def render_typing_assistant_bubble(text: str) -> None:
-    clean_text = text.strip()
-    if not clean_text:
-        return
-
-    placeholder = st.empty()
-    if len(clean_text) > 900:
-        placeholder.markdown(build_chat_bubble_html("assistant", clean_text), unsafe_allow_html=True)
-        return
-
-    words = clean_text.split()
-    typed_words: list[str] = []
-    for i, word in enumerate(words):
-        typed_words.append(word)
-        cursor = " ▌" if i < len(words) - 1 else ""
-        placeholder.markdown(
-            build_chat_bubble_html("assistant", " ".join(typed_words) + cursor),
-            unsafe_allow_html=True,
-        )
-        time.sleep(0.02)
-
-    placeholder.markdown(build_chat_bubble_html("assistant", clean_text), unsafe_allow_html=True)
 
 
 def render_profile_header(profile_image_path: Path | None, profile_image_url: str) -> None:
@@ -544,10 +559,6 @@ profile_image_path = find_profile_image_path(profile_data_path) if profile_data_
 render_profile_header(profile_image_path, profile_image_url)
 
 st.markdown('<div class="chat-title fade-in">💬 Ask anything about Mudassar</div>', unsafe_allow_html=True)
-st.markdown(
-    '<div class="chat-subtitle fade-in">Personal AI assistant powered by RAG + GROQ</div>',
-    unsafe_allow_html=True,
-)
 
 # =====================
 # API KEY + DATA CHECKS
@@ -631,46 +642,47 @@ if user_input:
     st.session_state.chat_history.append({"role": "user", "content": user_input, "type": "text"})
     render_chat_bubble("user", user_input)
 
-    with st.spinner("Thinking... 🤔"):
-        try:
-            raw_response = qa.invoke({"query": user_input})
-            response = raw_response.get("result", "") if isinstance(raw_response, dict) else str(raw_response)
+    try:
+        raw_response = qa.invoke({"query": user_input})
+        response = raw_response.get("result", "") if isinstance(raw_response, dict) else str(raw_response)
 
-            if should_use_full_context_fallback(response) and full_context.strip():
-                fallback_prompt = (
-                    "You are Mudassar's AI assistant. Use only the provided context. "
-                    "If user asks for image, return exactly SHOW_IMAGE. "
-                    "If the user asks about projects, list concrete project names and short descriptions from the context. "
-                    "If exact details are unavailable, clearly say what is missing and provide the closest relevant information.\n\n"
-                    f"Context:\n{full_context}\n\n"
-                    f"Question: {user_input}"
-                )
-                fallback_result = llm.invoke(fallback_prompt)
-                fallback_text = normalize_llm_text(fallback_result).strip()
-                if fallback_text:
-                    response = fallback_text
+        if should_use_full_context_fallback(response) and full_context.strip():
+            fallback_prompt = (
+                "You are Mudassar's AI assistant. Use only the provided context. "
+                "If user asks for image, return exactly SHOW_IMAGE. "
+                "Answer briefly and directly. Avoid extra greeting text unless the user greets first. "
+                "If the user asks about projects, list concrete project names from the context.\n\n"
+                f"Context:\n{full_context}\n\n"
+                f"Question: {user_input}"
+            )
+            fallback_result = llm.invoke(fallback_prompt)
+            fallback_text = normalize_llm_text(fallback_result).strip()
+            if fallback_text:
+                response = fallback_text
 
-            if should_show_profile_image(user_input, response):
-                if response.strip().upper() == "SHOW_IMAGE" or not response.strip():
-                    response = "Here is Mudassar's image."
+        response = clean_assistant_response(user_input, response)
 
-                st.session_state.chat_history.append({"role": "assistant", "content": response, "type": "text"})
-                render_typing_assistant_bubble(response)
+        if should_show_profile_image(user_input, response):
+            if response.strip().upper() == "SHOW_IMAGE" or not response.strip():
+                response = "Here is Mudassar's image."
 
-                st.session_state.chat_history.append({"role": "assistant", "content": "profile_image", "type": "image"})
-                render_profile_image_reply(profile_image_path, profile_image_url)
-            elif not response.strip():
-                warning_text = "The model returned an empty response. Please try rephrasing your question."
-                st.session_state.chat_history.append({"role": "assistant", "content": warning_text, "type": "text"})
-                render_chat_bubble("assistant", warning_text)
-            else:
-                st.session_state.chat_history.append({"role": "assistant", "content": response, "type": "text"})
-                render_typing_assistant_bubble(response)
+            st.session_state.chat_history.append({"role": "assistant", "content": response, "type": "text"})
+            render_chat_bubble("assistant", response)
 
-        except Exception as exc:
-            error_text = f"The Groq request failed: {type(exc).__name__}: {exc}"
-            st.session_state.chat_history.append({"role": "assistant", "content": error_text, "type": "text"})
-            render_chat_bubble("assistant", error_text)
+            st.session_state.chat_history.append({"role": "assistant", "content": "profile_image", "type": "image"})
+            render_profile_image_reply(profile_image_path, profile_image_url)
+        elif not response.strip():
+            warning_text = "Please try asking in a different way."
+            st.session_state.chat_history.append({"role": "assistant", "content": warning_text, "type": "text"})
+            render_chat_bubble("assistant", warning_text)
+        else:
+            st.session_state.chat_history.append({"role": "assistant", "content": response, "type": "text"})
+            render_chat_bubble("assistant", response)
+
+    except Exception as exc:
+        error_text = f"The Groq request failed: {type(exc).__name__}: {exc}"
+        st.session_state.chat_history.append({"role": "assistant", "content": error_text, "type": "text"})
+        render_chat_bubble("assistant", error_text)
 
 
 # =====================
@@ -681,6 +693,7 @@ st.sidebar.caption(f"Model: {groq_model}")
 
 if video_loaded:
     st.sidebar.success("🎬 Background video active")
+    st.sidebar.caption("If motion is still blocked on mobile, browser autoplay policy is likely preventing playback.")
 else:
     st.sidebar.warning("Background video file not found. Add `data/mudassar.mp4`.")
 
