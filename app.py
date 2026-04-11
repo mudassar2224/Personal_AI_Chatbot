@@ -578,7 +578,7 @@ def inject_modern_styles() -> None:
             }
 
             .chat-title {
-                font-size: 1.55rem;
+                font-size: 2.55rem;
             }
 
             .chat-bubble {
