@@ -75,6 +75,45 @@ def normalize_llm_text(value: object) -> str:
     return str(value)
 
 
+def has_profile_image(profile_image_path: Path | None, profile_image_url: str) -> bool:
+    return bool(profile_image_path) or bool(
+        profile_image_url and profile_image_url.lower() not in {"undefined", "none", "null"}
+    )
+
+
+def should_show_profile_image(question: str, answer: str) -> bool:
+    normalized_question = question.strip().lower()
+    normalized_answer = answer.strip().lower()
+
+    image_keywords = (
+        "image",
+        "photo",
+        "picture",
+        "pic",
+        "show me",
+        "profile",
+    )
+
+    return (
+        "show_image" in normalized_answer
+        or any(keyword in normalized_question for keyword in image_keywords)
+    )
+
+
+def render_profile_image_reply(profile_image_path: Path | None, profile_image_url: str) -> None:
+    if profile_image_path:
+        st.image(str(profile_image_path), width=260)
+        st.caption("Here is Mudassar's image.")
+        return
+
+    if profile_image_url and profile_image_url.lower() not in {"undefined", "none", "null"}:
+        st.image(profile_image_url, width=260)
+        st.caption("Here is Mudassar's image.")
+        return
+
+    st.warning("I couldn't find the profile image. Please add `mudassar.jpg` in `data/` or set `PROFILE_IMAGE_URL`.")
+
+
 def should_use_full_context_fallback(answer: str) -> bool:
     normalized = answer.strip().lower()
     if not normalized:
@@ -204,12 +243,13 @@ if not profile_image_url:
 profile_data_path = BASE_DIR / "data"
 profile_image_path = find_profile_image_path(profile_data_path) if profile_data_path.exists() else None
 
-if profile_image_path:
-    st.image(str(profile_image_path), width=200)
-    st.caption("Muhammad Mudassar - AI Developer")
-elif profile_image_url and profile_image_url.lower() not in {"undefined", "none", "null"}:
-    st.image(profile_image_url, width=200)
-    st.caption("Muhammad Mudassar - AI Developer")
+if has_profile_image(profile_image_path, profile_image_url):
+    if profile_image_path:
+        st.image(str(profile_image_path), width=200)
+        st.caption("Muhammad Mudassar - AI Developer")
+    else:
+        st.image(profile_image_url, width=200)
+        st.caption("Muhammad Mudassar - AI Developer")
 else:
     st.info("Profile image not found. Add one in `data/` (e.g., `mudassar.jpg`) or set `PROFILE_IMAGE_URL` in Secrets.")
 
@@ -301,7 +341,11 @@ if user_input:
                 if fallback_text:
                     response = fallback_text
 
-            if not response.strip():
+            if should_show_profile_image(user_input, response):
+                render_profile_image_reply(profile_image_path, profile_image_url)
+                if response.strip().upper() != "SHOW_IMAGE":
+                    st.success(response)
+            elif not response.strip():
                 st.warning("The model returned an empty response. Please try rephrasing your question.")
             else:
                 st.success(response)
