@@ -60,7 +60,7 @@ def build_qa_chain(data_path: Path, groq_api_key: str, data_signature: str):
     except Exception as exc:
         raise RuntimeError(
             f"LangChain dependencies failed to import ({exc.__class__.__name__}: {exc}). "
-            "If this is Streamlit Cloud, set Python to 3.11 in runtime.txt and reboot the app."
+            "If this is Streamlit Cloud, set Python to 3.11 in App Settings → Advanced settings and reboot the app."
         ) from exc
 
     text_files = get_text_files(data_path)
