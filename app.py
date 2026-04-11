@@ -279,16 +279,16 @@ def inject_modern_styles() -> None:
         """
         <style>
         :root {
-            --assistant-font-size: clamp(16px, 0.22vw + 15px, 17px);
-            --assistant-line-height: 1.7;
-            --user-font-size: clamp(15px, 0.16vw + 14.4px, 16px);
-            --user-line-height: 1.62;
+            --assistant-font-size: 14px;
+            --assistant-line-height: 1.5;
+            --user-font-size: 14px;
+            --user-line-height: 1.5;
         }
 
         .stApp {
             background: #0f172a;
             color: #e2e8f0;
-            font-family: "Segoe UI", "Inter", -apple-system, BlinkMacSystemFont, "Helvetica Neue", Arial, sans-serif;
+            font-family: "Segoe UI", "Inter", sans-serif;
         }
 
         [data-testid="stAppViewContainer"],
@@ -412,9 +412,9 @@ def inject_modern_styles() -> None:
         .chat-row.assistant { justify-content: flex-start; }
 
         .chat-bubble {
-            max-width: min(74%, 760px);
+            max-width: 88%;
             padding: 0.82rem 1rem;
-            border-radius: 14px;
+            border-radius: 8px;
             line-height: var(--assistant-line-height);
             font-size: var(--assistant-font-size);
             letter-spacing: 0.004em;
@@ -423,9 +423,9 @@ def inject_modern_styles() -> None:
         }
 
         .chat-bubble.user {
-            background: linear-gradient(135deg, rgba(37, 99, 235, 0.9), rgba(14, 165, 233, 0.82));
+            background: #0078d4;
             color: #ffffff;
-            border-bottom-right-radius: 6px;
+            border-radius: 8px;
             box-shadow: 0 8px 22px rgba(30, 64, 175, 0.34);
             white-space: pre-wrap;
             font-weight: 500;
@@ -434,10 +434,10 @@ def inject_modern_styles() -> None:
         }
 
         .chat-bubble.assistant {
-            background: rgba(255, 255, 255, 0.9);
-            color: #0b1220;
-            border: 1px solid rgba(148, 163, 184, 0.42);
-            border-bottom-left-radius: 6px;
+            background: #ffffff;
+            color: #111827;
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
             box-shadow: 0 8px 20px rgba(15, 23, 42, 0.22);
             font-weight: 430;
             font-size: var(--assistant-font-size);
@@ -495,7 +495,7 @@ def inject_modern_styles() -> None:
         .assistant-content h4,
         .assistant-content h5 {
             margin: 0.2rem 0 0.45rem;
-            line-height: 1.35;
+            line-height: 1.5;
             color: #0b1220;
         }
 
@@ -565,10 +565,10 @@ def inject_modern_styles() -> None:
 
         @media (max-width: 900px) {
             :root {
-                --assistant-font-size: 15.8px;
-                --assistant-line-height: 1.68;
-                --user-font-size: 15.1px;
-                --user-line-height: 1.6;
+                --assistant-font-size: 14px;
+                --assistant-line-height: 1.5;
+                --user-font-size: 14px;
+                --user-line-height: 1.5;
             }
 
             [data-testid="stAppViewContainer"] > .main .block-container {
@@ -582,7 +582,7 @@ def inject_modern_styles() -> None:
             }
 
             .chat-bubble {
-                max-width: 84%;
+                max-width: 88%;
                 padding: 0.76rem 0.88rem;
             }
 
