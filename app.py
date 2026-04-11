@@ -13,6 +13,22 @@ EMBEDDING_MODEL_NAME = "sentence-transformers/all-MiniLM-L6-v2"
 DEFAULT_GROQ_MODEL = "llama-3.1-8b-instant"
 FAISS_CACHE_DIR = BASE_DIR / ".cache" / "faiss_index"
 FAISS_META_PATH = BASE_DIR / ".cache" / "faiss_meta.json"
+PROFILE_IMAGE_CANDIDATES = (
+    "mudassar.jpg",
+    "mudassar.jpeg",
+    "mudassar.png",
+    "profile.jpg",
+    "profile.jpeg",
+    "profile.png",
+)
+FALLBACK_TRIGGER_PHRASES = (
+    "i don't have any information",
+    "i do not have any information",
+    "the provided context doesn't mention",
+    "doesn't provide any",
+    "does not provide any",
+    "no specific information",
+)
 
 
 def load_dotenv_file(env_path: Path) -> None:
@@ -36,6 +52,34 @@ def get_text_files(data_path: Path) -> list[Path]:
         [file_path for file_path in data_path.iterdir() if file_path.is_file() and file_path.suffix.lower() == ".txt"],
         key=lambda p: p.name.lower(),
     )
+
+
+def find_profile_image_path(data_path: Path) -> Path | None:
+    for candidate in PROFILE_IMAGE_CANDIDATES:
+        candidate_path = data_path / candidate
+        if candidate_path.exists():
+            return candidate_path
+    return None
+
+
+def normalize_llm_text(value: object) -> str:
+    if value is None:
+        return ""
+    if isinstance(value, str):
+        return value
+
+    content = getattr(value, "content", None)
+    if isinstance(content, str):
+        return content
+
+    return str(value)
+
+
+def should_use_full_context_fallback(answer: str) -> bool:
+    normalized = answer.strip().lower()
+    if not normalized:
+        return True
+    return any(phrase in normalized for phrase in FALLBACK_TRIGGER_PHRASES)
 
 
 def build_data_signature(text_files: list[Path]) -> str:
@@ -67,6 +111,18 @@ def build_qa_chain(data_path: Path, groq_api_key: str, groq_model: str, data_sig
     text_files = get_text_files(data_path)
     if not text_files:
         raise ValueError("No .txt files found in the data folder.")
+
+    full_context_sections = []
+    for file_path in text_files:
+        try:
+            content = file_path.read_text(encoding="utf-8").strip()
+        except Exception:
+            content = ""
+
+        if content:
+            full_context_sections.append(f"[{file_path.name}]\n{content}")
+
+    full_context = "\n\n".join(full_context_sections)
 
     embeddings = HuggingFaceEmbeddings(model_name=EMBEDDING_MODEL_NAME)
     db = None
@@ -117,11 +173,14 @@ def build_qa_chain(data_path: Path, groq_api_key: str, groq_model: str, data_sig
         except Exception:
             pass
 
-    retriever = db.as_retriever(search_kwargs={"k": 4})
+    retriever = db.as_retriever(
+        search_type="mmr",
+        search_kwargs={"k": 10, "fetch_k": 30, "lambda_mult": 0.3},
+    )
 
     llm = ChatGroq(api_key=groq_api_key, model=groq_model)
 
-    return RetrievalQA.from_chain_type(llm=llm, retriever=retriever), index_source, len(text_files)
+    return RetrievalQA.from_chain_type(llm=llm, retriever=retriever), index_source, len(text_files), llm, full_context
 
 
 # =====================
@@ -130,19 +189,33 @@ def build_qa_chain(data_path: Path, groq_api_key: str, groq_model: str, data_sig
 st.set_page_config(page_title="Mudassar AI", page_icon="🤖", layout="centered")
 st.title("🤖 Mudassar Personal AI Assistant (RAG + GROQ)")
 
+load_dotenv_file(BASE_DIR / ".env")
+
 # =====================
 # PROFILE IMAGE
 # =====================
-image_path = BASE_DIR / "data" / "mudassar.jpg"
-if image_path.exists():
-    st.image(str(image_path), width=200)
+profile_image_url = os.getenv("PROFILE_IMAGE_URL", "").strip()
+if not profile_image_url:
+    try:
+        profile_image_url = str(st.secrets.get("PROFILE_IMAGE_URL", "")).strip()
+    except Exception:
+        profile_image_url = ""
+
+profile_data_path = BASE_DIR / "data"
+profile_image_path = find_profile_image_path(profile_data_path) if profile_data_path.exists() else None
+
+if profile_image_path:
+    st.image(str(profile_image_path), width=200)
     st.caption("Muhammad Mudassar - AI Developer")
+elif profile_image_url and profile_image_url.lower() not in {"undefined", "none", "null"}:
+    st.image(profile_image_url, width=200)
+    st.caption("Muhammad Mudassar - AI Developer")
+else:
+    st.info("Profile image not found. Add one in `data/` (e.g., `mudassar.jpg`) or set `PROFILE_IMAGE_URL` in Secrets.")
 
 # =====================
 # API KEY + DATA CHECKS
 # =====================
-load_dotenv_file(BASE_DIR / ".env")
-
 groq_api_key = os.getenv("GROQ_API_KEY", "").strip()
 if not groq_api_key:
     try:
@@ -175,10 +248,23 @@ if not text_files:
     st.error("No `.txt` files were found in the `data` folder.")
     st.stop()
 
+empty_text_files = []
+for file_path in text_files:
+    try:
+        if not file_path.read_text(encoding="utf-8").strip():
+            empty_text_files.append(file_path.name)
+    except Exception:
+        empty_text_files.append(file_path.name)
+
 data_signature = build_data_signature(text_files)
 
 try:
-    qa, index_source, indexed_file_count = build_qa_chain(data_path, groq_api_key, groq_model, data_signature)
+    qa, index_source, indexed_file_count, llm, full_context = build_qa_chain(
+        data_path,
+        groq_api_key,
+        groq_model,
+        data_signature,
+    )
 except Exception as exc:
     st.error("Failed to initialize the RAG pipeline.")
     st.caption(str(exc))
@@ -201,6 +287,20 @@ if user_input:
         try:
             raw_response = qa.invoke({"query": user_input})
             response = raw_response.get("result", "") if isinstance(raw_response, dict) else str(raw_response)
+
+            if should_use_full_context_fallback(response) and full_context.strip():
+                fallback_prompt = (
+                    "You are Mudassar's AI assistant. Use only the provided context. "
+                    "If the user asks about projects, list concrete project names and short descriptions from the context. "
+                    "If exact details are unavailable, clearly say what is missing and provide the closest relevant information.\n\n"
+                    f"Context:\n{full_context}\n\n"
+                    f"Question: {user_input}"
+                )
+                fallback_result = llm.invoke(fallback_prompt)
+                fallback_text = normalize_llm_text(fallback_result).strip()
+                if fallback_text:
+                    response = fallback_text
+
             if not response.strip():
                 st.warning("The model returned an empty response. Please try rephrasing your question.")
             else:
@@ -221,6 +321,9 @@ if index_source == "cache":
     st.sidebar.success("⚡ FAISS index loaded from cache")
 else:
     st.sidebar.info("🧠 FAISS index rebuilt and cached")
+
+if empty_text_files:
+    st.sidebar.warning(f"Empty data files: {', '.join(empty_text_files)}")
 
 st.sidebar.caption(f"Indexed files: {indexed_file_count}")
 for file_path in text_files:
