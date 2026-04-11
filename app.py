@@ -130,7 +130,7 @@ def inject_modern_styles() -> None:
         """
         <style>
         .stApp {
-            background: #0b1020;
+            background: #0f172a;
             color: #e2e8f0;
         }
 
@@ -145,25 +145,42 @@ def inject_modern_styles() -> None:
             background: transparent !important;
         }
 
-        .video-background {
-            position: fixed;
+        [data-testid="stVideo"] {
+            position: fixed !important;
             inset: 0;
+            width: 100vw;
+            height: 100vh;
             z-index: -20;
             overflow: hidden;
+            pointer-events: none;
+            margin: 0 !important;
+            padding: 0 !important;
         }
 
-        .video-background video {
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-            filter: saturate(1.05) brightness(0.92);
+        [data-testid="stVideo"] > div {
+            width: 100% !important;
+            height: 100% !important;
+        }
+
+        [data-testid="stVideo"] video {
+            width: 100vw !important;
+            height: 100vh !important;
+            object-fit: cover !important;
+            filter: saturate(1.08) brightness(0.95);
+            background: #0f172a;
+        }
+
+        [data-testid="stVideo"] video::-webkit-media-controls {
+            display: none !important;
+            visibility: hidden !important;
+            opacity: 0 !important;
         }
 
         .video-overlay {
             position: fixed;
             inset: 0;
             z-index: -19;
-            background: rgba(3, 6, 13, 0.62);
+            background: rgba(15, 23, 42, 0.34);
         }
 
         [data-testid="stAppViewContainer"] > .main .block-container {
@@ -258,11 +275,11 @@ def inject_modern_styles() -> None:
         }
 
         .chat-bubble.assistant {
-            background: rgba(15, 23, 42, 0.82);
-            color: #e2e8f0;
-            border: 1px solid rgba(226, 232, 240, 0.12);
+            background: rgba(255, 255, 255, 0.78);
+            color: #0f172a;
+            border: 1px solid rgba(148, 163, 184, 0.35);
             border-bottom-left-radius: 6px;
-            box-shadow: 0 8px 20px rgba(2, 6, 23, 0.35);
+            box-shadow: 0 8px 20px rgba(15, 23, 42, 0.22);
         }
 
         .chat-image-wrap {
@@ -286,18 +303,29 @@ def inject_modern_styles() -> None:
 
         [data-testid="stChatInput"] > div {
             border-radius: 999px;
-            background: rgba(15, 23, 42, 0.8);
-            border: 1px solid rgba(226, 232, 240, 0.15);
-            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.35);
+            background: rgba(255, 255, 255, 0.96);
+            border: 1px solid rgba(148, 163, 184, 0.45);
+            box-shadow: 0 12px 26px rgba(15, 23, 42, 0.30);
             backdrop-filter: blur(8px);
         }
 
         [data-testid="stChatInput"] textarea {
-            color: #e2e8f0 !important;
+            color: #0f172a !important;
+            -webkit-text-fill-color: #0f172a !important;
+            caret-color: #0f172a !important;
+            font-weight: 500 !important;
         }
 
         [data-testid="stChatInput"] textarea::placeholder {
-            color: rgba(226, 232, 240, 0.8) !important;
+            color: #64748b !important;
+        }
+
+        [data-testid="stChatInput"] button {
+            color: #0f172a !important;
+        }
+
+        [data-testid="stChatInput"] button svg {
+            fill: #0f172a !important;
         }
 
         [data-testid="stSidebar"] {
@@ -312,22 +340,16 @@ def inject_modern_styles() -> None:
 
 
 def render_background_video(video_path: Path) -> bool:
-    video_data_uri = file_to_data_uri(str(video_path), "video/mp4")
-    if not video_data_uri:
+    if not video_path.exists():
         st.markdown('<div class="video-overlay"></div>', unsafe_allow_html=True)
         return False
 
-    st.markdown(
-        f"""
-        <div class="video-background">
-            <video autoplay loop muted playsinline>
-                <source src="{video_data_uri}" type="video/mp4" />
-            </video>
-        </div>
-        <div class="video-overlay"></div>
-        """,
-        unsafe_allow_html=True,
-    )
+    try:
+        st.video(str(video_path), autoplay=True, muted=True, loop=True)
+    except TypeError:
+        st.video(str(video_path))
+
+    st.markdown('<div class="video-overlay"></div>', unsafe_allow_html=True)
     return True
 
 
